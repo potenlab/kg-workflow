@@ -222,7 +222,51 @@ The snippet tells Claude:
 
 The snippet is delimited by `<!-- kg-workflow:begin -->` and `<!-- kg-workflow:end -->` so future updates can find and replace it cleanly.
 
-## Phase 7 — Report
+## Phase 7 — Initialize Entire (session tracking)
+
+The kg-workflow agent fleet's history lookup (`kg-history-check`) calls the [Entire](https://docs.entire.io) CLI to search prior prompts and decisions. If Entire isn't enabled for this repo, the history agent will return `entire_not_initialized` on every dispatch — usable, but degraded.
+
+Detect and offer to enable:
+
+```bash
+if command -v entire >/dev/null 2>&1; then
+  if [ -d "$PROJECT_ROOT/.entire" ]; then
+    echo "[kg-init] ✓ Entire already enabled (.entire/ present)"
+  else
+    echo "[kg-init] → Enabling Entire session tracking..."
+    ( cd "$PROJECT_ROOT" && entire enable )
+    echo "[kg-init] ✓ Entire enabled"
+  fi
+else
+  cat <<MSG
+[kg-init] ⚠ Entire CLI not found. The kg-history-check agent will degrade gracefully
+            but you'll lose prior-prompt context on every dispatch.
+
+            Install: see https://docs.entire.io
+            Then re-run: cd $PROJECT_ROOT && entire enable
+
+            Proceeding without Entire — this is non-fatal.
+MSG
+fi
+```
+
+Do not error if Entire is missing — the agent fleet works without it, with reduced fidelity. Surface the warning once at init time so the user can decide.
+
+## Phase 8 — Verify agents are reachable
+
+The kg-workflow plugin ships four subagents that the CLAUDE.md stanza tells the main session to dispatch:
+
+- `kg-context-dispatch` — the entry point invoked by main Claude
+- `kg-ssot-check`, `kg-impl-check`, `kg-history-check` — fanned out in parallel by the dispatcher
+
+These were installed when the plugin was installed (they live in `<plugin>/agents/`). Verify they're reachable in this Claude Code session by checking that subagent type lookup would resolve them. If you cannot verify, print a warning telling the user to `/clear` after the first init so the agents register.
+
+```
+[kg-init] ✓ Agents     kg-context-dispatch, kg-ssot-check, kg-impl-check, kg-history-check
+                        (run /clear if /kg-init was your first invocation, so they register)
+```
+
+## Phase 9 — Report
 
 Print a summary:
 
@@ -231,12 +275,17 @@ Print a summary:
 [kg-init] ✓ SSOT KG    .understand-anything-ssot/   (seeded from Impl)
 [kg-init] ✓ Script     scripts/ssot_seed.py
 [kg-init] ✓ CLAUDE.md  appended kg-workflow stanza
+[kg-init] ✓ Entire     enabled (or warning emitted in Phase 7)
+[kg-init] ✓ Agents     kg-context-dispatch + 3 leaves
 
 Next steps:
   1. Read .understand-anything-ssot/README.md to understand the SSOT fields.
   2. Decide how you want to mutate SSOT going forward (out of scope for this plugin) —
      options include a Decision Log + replay tool, direct hand-edits with code review,
      or a separate workflow tool.
+  3. Try a substantive prompt; main Claude should dispatch to kg-context-dispatch
+     before answering. If it doesn't, verify the kg-workflow stanza was appended to
+     CLAUDE.md and run /clear once.
 ```
 
 ## Error handling
