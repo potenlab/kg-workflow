@@ -19,7 +19,7 @@ Additional:
 | `status` | enum | `inherited | confirmed | spec | wip | implemented | drift | deprecated` |
 | `acceptance` | string \| null | Behavioral spec (NL or Gherkin). Test seed. |
 | `contract` | string \| null | I/O types, error modes, invariants. |
-| `rationale_ref` | string[] | Decision Log entry IDs that touched this node. |
+| `rationale_ref` | string[] | Free-form references (ticket IDs, doc links, ADR IDs, etc.). |
 | `touch_budget` | string[] \| null | File globs implementations may edit. |
 
 ## Per-edge SSOT fields
@@ -27,7 +27,7 @@ Additional:
 | field | type | meaning |
 |---|---|---|
 | `status` | enum | `inherited | confirmed | spec | implemented | drift | deprecated` |
-| `rationale_ref` | string[] | Decision Log entry IDs that touched this edge. |
+| `rationale_ref` | string[] | Free-form references. |
 
 ## Per-layer SSOT fields
 
@@ -35,16 +35,16 @@ Additional:
 |---|---|---|
 | `status` | enum | `inherited | confirmed | spec | implemented | drift | deprecated` |
 | `acceptance` | string \| null | Layer-wide invariant. |
-| `rationale_ref` | string[] | Decision Log entry IDs that touched this layer. |
+| `rationale_ref` | string[] | Free-form references. |
 
 ## Status lifecycle
 
 ```
-inherited ──┬──> confirmed   (DL entry affirms current shape)
-            ├──> spec        (DL entry declares new intent, code not yet matching)
-            └──> deprecated  (DL entry marks for removal)
+inherited ──┬──> confirmed   (explicitly affirmed)
+            ├──> spec        (declared intent, code not yet matching)
+            └──> deprecated  (marked for removal)
 
-spec ──> wip ──> implemented   (code now matches SSOT, verified by ssot_diff)
+spec ──> wip ──> implemented  (code now matches SSOT)
                        │
                        └──> drift  (code diverged from SSOT)
 ```

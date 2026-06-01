@@ -1,0 +1,19 @@
+# Editor / tooling local state
+.entire/
+.claude/
+.cursor/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node (in case someone vendors npm assets later)
+node_modules/

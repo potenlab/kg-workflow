@@ -2,7 +2,7 @@
 
 Parallel to `.understand-anything/` (Impl KG, `autoUpdate=true`, derived from source).
 
-This KG represents **intent** — what the code should be, not what it is. It is a **projection** of the Decision Log at `docs/ssot/decisions/index.jsonl`.
+This KG represents **intent** — what the code should be, not what it is. It was seeded once by [kg-workflow](https://github.com/potenlab/kg-workflow)'s `/kg-init` from the Impl KG at seed time.
 
 ## Files
 
@@ -16,28 +16,26 @@ This KG represents **intent** — what the code should be, not what it is. It is
 - `status`: `inherited | confirmed | spec | wip | implemented | drift | deprecated`
 - `acceptance`: behavioral spec (natural language or Gherkin). Seeds tests.
 - `contract`: input/output types, error modes, invariants.
-- `rationale_ref`: list of Decision Log entry IDs (`DL-YYYY-MM-DD-NNN`).
+- `rationale_ref`: list of references explaining why the field is what it is (free-form — e.g. ticket IDs, doc links, ADR IDs).
 - `touch_budget`: list of file globs implementations are allowed to touch.
 
 ## SSOT edge fields
 
 - `status`: `inherited | confirmed | spec | implemented | drift | deprecated`
-- `rationale_ref`: list of DL IDs.
+- `rationale_ref`: list of references.
 
 ## SSOT layer fields
 
 - `status`: `inherited | confirmed | spec | implemented | drift | deprecated`
 - `acceptance`: layer-wide invariant.
-- `rationale_ref`: list of DL IDs.
+- `rationale_ref`: list of references.
 
-## Editing rules
+## How SSOT is mutated
 
-**Never edit `knowledge-graph.json` directly.** All mutations flow through the Decision Log:
+**Not defined by kg-workflow.** Pick a process that fits this repo:
 
-1. Append a `DL-YYYY-MM-DD-NNN` entry to `docs/ssot/decisions/index.jsonl`.
-2. Run `python3 scripts/ssot_replay.py` to rebuild this file.
-3. Run `python3 scripts/ssot_diff.py` to see drift vs Impl.
+- An append-only Decision Log with a deterministic replay script (recommended for teams).
+- Hand-edits to `knowledge-graph.json` reviewed via normal code review.
+- A separate workflow tool you bring yourself.
 
-Replay is idempotent — running it twice produces an identical KG.
-
-See `docs/ssot/decisions/README.md` for the full effect grammar.
+Whatever you pick, document it here and follow it consistently. The fields above are stable; the process is yours to choose.

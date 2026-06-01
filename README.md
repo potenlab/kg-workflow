@@ -1,19 +1,25 @@
 # kg-workflow
 
-Dual knowledge-graph workflow for any codebase, installed as a Claude Code plugin. Built on top of [understand-anything](https://github.com/Lum1104/Understand-Anything).
+Bootstraps a dual knowledge-graph layout in any repo, installed as a Claude Code plugin. Built on top of [understand-anything](https://github.com/Lum1104/Understand-Anything).
 
 Run `/kg-init` once. You get:
 
 - **Impl KG** — `.understand-anything/knowledge-graph.json` — what the code IS. Maintained by `understand-anything`.
-- **SSOT KG** — `.understand-anything-ssot/knowledge-graph.json` — what the code SHOULD BE. Projected from a Decision Log at `docs/ssot/decisions/`.
-- **Scripts** — `scripts/ssot_{seed,replay,diff}.py` for bootstrapping, replaying decisions, and detecting drift.
+- **SSOT KG** — `.understand-anything-ssot/knowledge-graph.json` — what the code SHOULD BE. Seeded once from the Impl KG with SSOT defaults (`status`, `acceptance`, `contract`, `rationale_ref`, `touch_budget`).
+- **Seed script** — `scripts/ssot_seed.py` for deterministic re-seeding if you ever need it.
 - **CLAUDE.md stanza** — wires Claude to always consult SSOT first, Impl second.
 
-## Why
+## Scope
 
-Knowledge graphs of code answer "what is" — good for navigation, weak for guiding new work. An SSOT KG answers "what should be" — drift between the two is the signal you actually want to see before a PR.
+kg-workflow is **deliberately narrow**. It only bootstraps the two KGs and tells Claude how to read them.
 
-The Decision Log is the real source of truth. The SSOT KG is just a projection of it. Replay is idempotent — two runs produce the same KG byte-for-byte.
+It does **not**:
+
+- Define a Decision Log, replay tool, or drift detector.
+- Scaffold `docs/ssot/` or any process directory.
+- Take a position on how you mutate SSOT after seeding.
+
+How SSOT evolves is your call — pick a Decision Log + replay tool, hand-edit with code review, or bring a separate workflow. kg-workflow stops at the seed.
 
 ## Install
 
@@ -48,28 +54,16 @@ cd your-repo
 That's it. `kg-init` will:
 
 1. Build the Impl KG via `/understand --full` against the repo root.
-2. Seed the SSOT KG from the Impl KG (every node, edge, layer gets SSOT defaults).
-3. Scaffold `docs/ssot/decisions/` (Decision Log) and `docs/ssot/meetings/` (audio + transcripts).
-4. Drop `scripts/ssot_seed.py`, `scripts/ssot_replay.py`, `scripts/ssot_diff.py`.
-5. Append a kg-workflow stanza to `CLAUDE.md` so Claude consults SSOT first, Impl second.
-
-### Day-2 workflow
-
-```bash
-# After a planning meeting:
-mlx_whisper --output-dir docs/ssot/meetings/transcripts/ \
-            --output-format txt docs/ssot/meetings/raw/2026-06-01-foundations.m4a
-
-# Append DL entries to docs/ssot/decisions/index.jsonl (see template README for grammar)
-# Then:
-python3 scripts/ssot_replay.py
-python3 scripts/ssot_diff.py        # before every non-trivial PR
-```
+2. Drop `scripts/ssot_seed.py`.
+3. Seed the SSOT KG from the Impl KG (every node, edge, layer gets SSOT defaults).
+4. Drop `.understand-anything-ssot/{README,schema}.md`.
+5. Write a root `.understandignore` if one isn't already present.
+6. Append a kg-workflow stanza to `CLAUDE.md` so Claude consults SSOT first, Impl second.
 
 ## What `/kg-init` will NOT do
 
 - Overwrite an existing `.understand-anything/` or `.understand-anything-ssot/` — it refuses and asks you to delete first.
-- Edit code outside `CLAUDE.md`, `.understand-anything*/`, `docs/ssot/`, and `scripts/`.
+- Edit code outside `CLAUDE.md`, `.understand-anything*/`, and `scripts/ssot_seed.py`.
 - Hide failures. If `/understand` fails, `kg-init` stops there and surfaces the error.
 
 ## Repo layout
@@ -77,8 +71,7 @@ python3 scripts/ssot_diff.py        # before every non-trivial PR
 ```
 kg-workflow/
 ├── .claude-plugin/
-│   ├── marketplace.json
-│   └── plugin.json
+│   └── marketplace.json
 ├── kg-workflow-plugin/
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/
@@ -89,12 +82,8 @@ kg-workflow/
 │       ├── ssot/
 │       │   ├── README.md
 │       │   └── schema.md
-│       ├── decisions/
-│       │   └── README.md               # Decision Log format + effect grammar
 │       └── scripts/
-│           ├── ssot_seed.py
-│           ├── ssot_replay.py
-│           └── ssot_diff.py
+│           └── ssot_seed.py            # only script shipped
 ├── install.sh                          # one-line installer for non-Claude-Code platforms
 ├── README.md
 └── LICENSE
