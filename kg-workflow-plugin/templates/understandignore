@@ -1,0 +1,80 @@
+# .understandignore — patterns for files/dirs to exclude from UA analysis.
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs).
+#
+# Installed by kg-workflow. Tuned for mixed-language repos (Python + TS/JS + docs).
+# Edit freely after /kg-init to match your project layout.
+
+# --- Secrets / local data (NEVER analyze or embed) ---
+.env
+.env.*
+.secrets/
+.keys/
+.data/
+*.db
+*.db-shm
+*.db-wal
+*.key
+google-sa.json
+
+# --- KG / tool state (don't analyze self) ---
+.understand-anything/
+.understand-anything-ssot/
+.understand-anything-plugin/
+.claude/
+.cursor/
+.kg-workflow/
+
+# --- Top-level meta / docs (not source) ---
+docs/
+README.md
+CLAUDE.md
+LICENSE
+LICENSE.md
+
+# --- Build artifacts & dependencies ---
+node_modules/
+.next/
+.nuxt/
+.svelte-kit/
+dist/
+build/
+out/
+.cache/
+.turbo/
+.parcel-cache/
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+.tmp/
+.tmp-screenshots/
+
+# --- Test / data file patterns ---
+*.test.ts
+*.test.tsx
+*.test.js
+*.test.jsx
+*.spec.ts
+*.spec.tsx
+*.spec.js
+*.spec.jsx
+*.test.py
+*_test.py
+test_*.py
+tests/
+__tests__/
+*.snap
+*.fixture.*
+
+# --- Coverage & lint ---
+coverage/
+.nyc_output/
+.eslintcache
+
+# --- Misc ---
+*.log
+.DS_Store
+Thumbs.db

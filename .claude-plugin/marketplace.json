@@ -1,0 +1,15 @@
+{
+  "name": "kg-workflow",
+  "metadata": {
+    "description": "Dual knowledge-graph workflow: Impl KG (what code IS) + SSOT KG (what code SHOULD BE), wired into Claude Code via /kg-init."
+  },
+  "owner": {
+    "name": "potenlab"
+  },
+  "plugins": [
+    {
+      "name": "kg-workflow",
+      "source": "./kg-workflow-plugin"
+    }
+  ]
+}
