@@ -43,6 +43,7 @@ Supported platforms: `codex`, `gemini`, `opencode`, `vscode`, `vibe`. See `insta
 - `understand-anything` plugin installed (kg-workflow calls its `/understand` skill to build the Impl KG).
 - `python3` 3.11+ on the user's machine.
 - A git repo. `kg-init` refuses to run outside one.
+- **An SSOT process docs directory** (e.g. `docs/ssot/`, `docs/decisions/`, `ssot/`, `.ssot/`). kg-workflow does NOT create this — it only references it from CLAUDE.md. If `/kg-init` can't find one, it stops and prompts you (see below).
 
 ## Usage
 
@@ -51,14 +52,22 @@ cd your-repo
 /kg-init
 ```
 
-That's it. `kg-init` will:
+`kg-init` will:
 
-1. Build the Impl KG via `/understand --full` against the repo root.
-2. Drop `scripts/ssot_seed.py`.
-3. Seed the SSOT KG from the Impl KG (every node, edge, layer gets SSOT defaults).
-4. Drop `.understand-anything-ssot/{README,schema}.md`.
-5. Write a root `.understandignore` if one isn't already present.
-6. Append a kg-workflow stanza to `CLAUDE.md` so Claude consults SSOT first, Impl second.
+1. **Detect your SSOT process docs.** If none of `docs/ssot/`, `docs/SSOT/`, `ssot/`, `.ssot/`, or `docs/decisions/` is present, kg-init **stops and prompts** you with three options:
+   - `/kg-init --ssot-docs <path>` — I have docs at a custom path
+   - Initialize docs first using your own tool/process, then re-run
+   - `/kg-init --ssot-docs none` — proceed with no docs reference
+2. Build the Impl KG via `/understand --full` against the repo root.
+3. Drop `scripts/ssot_seed.py`.
+4. Seed the SSOT KG from the Impl KG (every node, edge, layer gets SSOT defaults).
+5. Drop `.understand-anything-ssot/{README,schema}.md`.
+6. Write a root `.understandignore` if one isn't already present.
+7. Append a kg-workflow stanza to `CLAUDE.md` so Claude consults SSOT first, Impl second — and, when configured, points at your SSOT process docs.
+
+### Why the docs prompt is hard, not auto
+
+kg-workflow won't silently default to "no docs" on your behalf. Forcing the explicit re-invocation makes the choice visible in your terminal history and nudges you to actually set up a mutation process (Decision Log, replay tool, whatever) before locking in the KG layout.
 
 ## What `/kg-init` will NOT do
 

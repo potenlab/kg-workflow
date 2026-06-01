@@ -28,6 +28,7 @@ It will **not**:
 - `--scripts-dir <dir>` — where to install `ssot_seed.py` (default: `scripts/`).
 - `--no-claude-md` — skip the CLAUDE.md edit (advanced; you must wire SSOT-first manually).
 - `--language <lang>` — passed through to `/understand` for natural-language output (default: `en`).
+- `--ssot-docs <path>` — explicit path to the SSOT process docs (e.g. `docs/ssot/`). Skips the detection prompt in Phase 0.5. Pass `--ssot-docs none` to confirm no docs reference is wanted.
 
 ## Hard preconditions (abort if violated)
 
@@ -64,6 +65,70 @@ if [ -z "$PLUGIN_ROOT" ] || [ ! -d "$PLUGIN_ROOT/templates" ]; then
   exit 1
 fi
 ```
+
+## Phase 0.5 — Detect SSOT process docs (and prompt if missing)
+
+kg-workflow does **not** own how SSOT is mutated (Decision Log, replay scripts, meeting transcripts, etc.). But the CLAUDE.md stanza we'll write in Phase 6 is more useful if it can **point Claude at the user's existing SSOT process docs**. Without that pointer, Claude knows the SSOT KG exists but has no idea where the team's mutation process is documented.
+
+So before the destructive phases, detect whether the user already has such a docs structure. If not, **prompt** them — don't silently proceed.
+
+### 0.5.a — Honor `--ssot-docs <path>` if set
+
+If the user passed `--ssot-docs <path>`:
+
+- If `<path>` is the literal string `none`, set `SSOT_DOCS_PATH=""` and skip detection / prompt. The CLAUDE.md snippet will be rendered without a docs reference. Log this decision.
+- Otherwise, resolve `<path>` against `$PROJECT_ROOT`. If it does not exist or is not a directory, **STOP** and tell the user the path is invalid. Do not auto-create it.
+- If it exists, set `SSOT_DOCS_PATH="$path"` and skip to Phase 1.
+
+### 0.5.b — Auto-detect
+
+If `--ssot-docs` was not passed, look for a docs structure under these candidate paths (first hit wins):
+
+```
+docs/ssot/
+docs/SSOT/
+ssot/
+.ssot/
+docs/decisions/
+```
+
+A candidate counts as "present" if the directory exists **and** contains at least one of: a `README.md`, an `index.jsonl`, an `entries/` subdir, a `decisions/` subdir, or any `.md` file.
+
+If any candidate matches, set `SSOT_DOCS_PATH` to it and skip to Phase 1. Print which path you matched on so the user can correct you if needed.
+
+### 0.5.c — Prompt the user (no candidate matched)
+
+If no candidate matched, **stop and prompt the user with this exact text** (do not auto-create anything, do not guess):
+
+```
+[kg-init] No SSOT process docs detected.
+
+I looked for one of:
+  docs/ssot/  docs/SSOT/  ssot/  .ssot/  docs/decisions/
+
+kg-workflow does NOT create or own these docs — how SSOT is mutated
+after seeding is your team's choice (Decision Log + replay tool,
+hand-edits + code review, a separate workflow tool, etc.).
+
+You have three options:
+
+  (A) I already have SSOT docs elsewhere — give me the path:
+      Re-run: /kg-init --ssot-docs <path-to-your-docs>
+
+  (B) I haven't set up SSOT docs yet — let me initialize them first
+      using my own tool/process, then re-run /kg-init.
+
+  (C) I want to proceed without any SSOT docs reference. The SSOT KG
+      will still be seeded; the CLAUDE.md stanza just won't point
+      anywhere for process docs:
+      Re-run: /kg-init --ssot-docs none
+```
+
+After printing this, **STOP**. Do not continue to Phase 1. Do not write any files. Wait for the user to re-run `/kg-init` with their chosen option.
+
+### Why this is a hard prompt (not a soft default)
+
+Silently picking option (C) on the user's behalf would bake a half-configured CLAUDE.md into the repo and let Claude pretend a process exists when there isn't one. Forcing the explicit re-invocation makes the decision visible in the user's terminal history and forces them to think about (B) — actually setting up a mutation process — before locking in a KG layout.
 
 ## Phase 1 — Build the Impl KG
 
@@ -117,19 +182,33 @@ cp "$PLUGIN_ROOT/templates/understandignore" "$PROJECT_ROOT/.understand-anything
 
 ## Phase 6 — Wire CLAUDE.md (skip if `--no-claude-md`)
 
-Append the kg-workflow stanza to the root `CLAUDE.md`. If `CLAUDE.md` does not exist, create it with this stanza as the entire body.
+Render the kg-workflow stanza, substituting `$SSOT_DOCS_PATH` (resolved in Phase 0.5), then append it to the root `CLAUDE.md`. If `CLAUDE.md` does not exist, create it with this stanza as the entire body.
+
+The snippet template contains a `{{SSOT_DOCS_LINE}}` placeholder. Render it as follows:
+
+- If `SSOT_DOCS_PATH` is non-empty: replace `{{SSOT_DOCS_LINE}}` with
+  `For the team's SSOT mutation process, see \`<path>/\`.`
+- If `SSOT_DOCS_PATH` is empty (user passed `--ssot-docs none`): replace with
+  `(No SSOT process docs configured — bring your own.)`
 
 ```bash
 SNIPPET="$PLUGIN_ROOT/templates/claude-md-snippet.md"
 TARGET="$PROJECT_ROOT/CLAUDE.md"
 MARKER="<!-- kg-workflow:begin -->"
 
+if [ -n "$SSOT_DOCS_PATH" ]; then
+  DOCS_LINE="For the team's SSOT mutation process, see \`$SSOT_DOCS_PATH/\`."
+else
+  DOCS_LINE="(No SSOT process docs configured — bring your own.)"
+fi
+
 if [ -f "$TARGET" ] && grep -qF "$MARKER" "$TARGET"; then
   echo "[kg-init] CLAUDE.md already contains a kg-workflow stanza — skipping append."
 else
+  RENDERED="$(sed "s|{{SSOT_DOCS_LINE}}|$DOCS_LINE|g" "$SNIPPET")"
   {
     [ -f "$TARGET" ] && echo ""
-    cat "$SNIPPET"
+    printf '%s\n' "$RENDERED"
   } >> "$TARGET"
 fi
 ```

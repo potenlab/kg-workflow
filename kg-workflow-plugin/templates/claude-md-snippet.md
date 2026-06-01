@@ -32,5 +32,7 @@ Each SSOT node has a `status`:
 
 How SSOT is mutated after seeding is **not defined by kg-workflow** — pick a process that fits this repo (e.g. a Decision Log + replay script, hand-edits with code review, or a separate workflow tool). Whatever you pick, never edit `.understand-anything-ssot/knowledge-graph.json` in a way that contradicts the chosen process.
 
+{{SSOT_DOCS_LINE}}
+
 See `.understand-anything-ssot/README.md` for the SSOT field reference.
 <!-- kg-workflow:end -->
