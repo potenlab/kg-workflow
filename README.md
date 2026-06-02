@@ -39,7 +39,7 @@ Then just work normally. Ask for a feature. The pre-flight runs automatically.
 
 | Artifact | What it is |
 |----------|-----------|
-| **Impl KG** — `.understand-anything/knowledge-graph.json` | What the code **IS**. Built & maintained by `understand-anything`. |
+| **Impl KG** — `.understand-anything/knowledge-graph.json` | What the code **IS**. Built by `understand-anything` and **auto-updated on every git commit** (kg-init enables `--auto-update`), so the blast-radius data never goes stale. |
 | **SSOT KG** — `.understand-anything-ssot/knowledge-graph.json` | What the code **SHOULD BE**. Seeded once from the Impl KG with intent fields: `status`, `acceptance`, `contract`, `rationale_ref`, `touch_budget`. |
 | **Entire tracking** — `.entire/` | Local prompt/decision history. Auto-enabled if the `entire` CLI is present. |
 | **The agent fleet** | `kg-context-dispatch` (orchestrator) + the three checkers above. |
@@ -144,7 +144,7 @@ Supported platforms: `codex`, `gemini`, `opencode`, `vscode`, `vibe`. See `insta
    - `/kg-init --ssot-docs <path>` — I have docs at a custom path
    - set up docs first with your own tool, then re-run
    - `/kg-init --ssot-docs none` — proceed with no docs reference
-2. Build the Impl KG via `/understand --full`.
+2. Build the Impl KG via `/understand --full --auto-update` — the `--auto-update` arms understand-anything's commit hook so the Impl KG refreshes incrementally on every `git commit` / `merge` / `rebase`. (The SSOT KG stays manual — intent is mutated deliberately, not regenerated.)
 3. Drop `scripts/ssot_seed.py`.
 4. Seed the SSOT KG from the Impl KG.
 5. Drop `.understand-anything-ssot/{README,schema}.md`.

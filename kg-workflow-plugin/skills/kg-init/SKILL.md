@@ -10,7 +10,7 @@ One-shot bootstrap for the dual-KG pattern. Run this **once** per repo, on a cle
 
 It will:
 
-1. Build the **Impl KG** by invoking the `understand` skill (`understand-anything` plugin).
+1. Build the **Impl KG** by invoking the `understand` skill (`understand-anything` plugin) with `--auto-update`, so it refreshes on every git commit.
 2. Seed the **SSOT KG** by projecting the Impl KG into `.understand-anything-ssot/` with SSOT fields added.
 3. Install `scripts/ssot_seed.py` so the seed can be replayed deterministically.
 4. Append a **kg-workflow** stanza to the root `CLAUDE.md` telling Claude to **consult SSOT first, Impl second** on every code question.
@@ -130,13 +130,22 @@ After printing this, **STOP**. Do not continue to Phase 1. Do not write any file
 
 Silently picking option (C) on the user's behalf would bake a half-configured CLAUDE.md into the repo and let Claude pretend a process exists when there isn't one. Forcing the explicit re-invocation makes the decision visible in the user's terminal history and forces them to think about (B) — actually setting up a mutation process — before locking in a KG layout.
 
-## Phase 1 — Build the Impl KG
+## Phase 1 — Build the Impl KG (and enable auto-update on commit)
 
-Invoke the `understand` skill against `$PROJECT_ROOT` with `--full`. Forward `--language <lang>` if the user passed it.
+Invoke the `understand` skill against `$PROJECT_ROOT` with **`--full --auto-update`**. Forward `--language <lang>` if the user passed it.
+
+```
+/understand --full --auto-update [--language <lang>] $PROJECT_ROOT
+```
+
+- `--full` forces a complete first build of the Impl KG.
+- `--auto-update` writes `{"autoUpdate": true}` into `.understand-anything/config.json`. This arms understand-anything's **own** PostToolUse hook, which fires after `git commit` / `merge` / `rebase` and runs an incremental KG update. From then on the Impl KG (what the code IS) stays in sync with the codebase automatically — no manual `/understand` re-runs.
 
 The `understand` skill writes `$PROJECT_ROOT/.understand-anything/knowledge-graph.json` and friends. Do **not** continue until it reports success.
 
 If `/understand` does not produce `.understand-anything/knowledge-graph.json`, abort and surface the failure — do not attempt to seed SSOT from a missing file.
+
+> **Impl auto-updates; SSOT does not.** Only the Impl KG is wired to refresh on commit. The SSOT KG (seeded in Phase 3 with `{"autoUpdate": false}`) represents *intent* and must be mutated deliberately — never regenerated from source. Leave SSOT auto-update off.
 
 ## Phase 2 — Install the seed script
 
@@ -281,8 +290,8 @@ plugin's hooks load.
 Print a summary:
 
 ```
-[kg-init] ✓ Impl KG    .understand-anything/        (N nodes, M edges, L layers)
-[kg-init] ✓ SSOT KG    .understand-anything-ssot/   (seeded from Impl)
+[kg-init] ✓ Impl KG    .understand-anything/        (N nodes, M edges, L layers; auto-update ON)
+[kg-init] ✓ SSOT KG    .understand-anything-ssot/   (seeded from Impl; auto-update OFF by design)
 [kg-init] ✓ Script     scripts/ssot_seed.py
 [kg-init] ✓ CLAUDE.md  appended kg-workflow stanza
 [kg-init] ✓ Entire     enabled (or warning emitted in Phase 7)
