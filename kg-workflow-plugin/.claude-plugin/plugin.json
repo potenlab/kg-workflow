@@ -1,7 +1,7 @@
 {
   "name": "kg-workflow",
   "description": "Dual knowledge-graph workflow built on understand-anything: Impl KG (autoUpdate, derived from source) + SSOT KG (intent/spec, projected from a Decision Log). Bootstraps via /kg-init.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "potenlab"
   },
