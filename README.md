@@ -1,77 +1,121 @@
 # kg-workflow
 
-A Claude Code plugin that bootstraps a **dual knowledge-graph + parallel-context-dispatch** workflow in any repo. Built on top of [understand-anything](https://github.com/Lum1104/Understand-Anything) and [Entire](https://docs.entire.io).
+> **A side-effect radar for your codebase.**
+> Every time you ask Claude to build or change a feature, kg-workflow runs a pre-flight check *first* — and warns you what else that change will touch *before* a single line is edited.
 
-Run `/kg-init` once. You get:
+Built on [understand-anything](https://github.com/Lum1104/Understand-Anything) and [Entire](https://docs.entire.io).
 
-- **Impl KG** — `.understand-anything/knowledge-graph.json` — what the code IS. Maintained by `understand-anything`.
-- **SSOT KG** — `.understand-anything-ssot/knowledge-graph.json` — what the code SHOULD BE. Seeded once from the Impl KG with SSOT defaults (`status`, `acceptance`, `contract`, `rationale_ref`, `touch_budget`).
-- **Entire session tracking** — `.entire/` — local prompt/decision history, automatically enabled if the `entire` CLI is present.
-- **Four sub-agents** — `kg-context-dispatch`, `kg-ssot-check`, `kg-impl-check`, `kg-history-check` — wired into CLAUDE.md so every substantive prompt gets a pre-flight context briefing and a side-effect warning.
-- **Seed script** — `scripts/ssot_seed.py` for deterministic re-seeding if you ever need it.
+---
 
-## How it works at runtime
+## The problem it solves
 
-Every substantive prompt (not greetings or "looks good") triggers this flow:
+You ask for a "small change." Claude edits the file. Three other features quietly break, because nobody flagged that 8 things depended on that function — or that this code was already deprecated, or that you decided *not* to do this exact thing two weeks ago.
 
-```
-User prompt
-   │
-   ▼
-Main Claude reads CLAUDE.md → Task(kg-context-dispatch)
-   │
-   ▼
-kg-context-dispatch  (Phase A: cheap classify; Phase B: extract topic hints)
-   │
-   ▼  Phase C: fan out IN PARALLEL — single message, three Task calls
-   ├──────────────────────────┬──────────────────────────┐
-   ▼                          ▼                          ▼
-kg-ssot-check            kg-impl-check             kg-history-check
-.understand-anything-    .understand-anything/    .entire/ via
-ssot/ → status,          → relevant nodes +       entire search →
-acceptance, contract,    DEPENDENTS (the          prior decisions,
-touch_budget,            side-effect signal)      sessions, prompts
-rationale_ref
-   │                          │                          │
-   └──────────────────────────┴──────────────────────────┘
-                              │
-                              ▼
-kg-context-dispatch  (Phase D: synthesize + compute side_effect_warning)
-                              │
-                              ▼
-Main Claude proceeds with compact JSON briefing as authoritative context.
-If side_effect_warning=true, surface warning_text to user BEFORE editing.
+**kg-workflow stops that.** Before any substantive change, it answers three questions in parallel:
+
+| Question | Agent | Source |
+|----------|-------|--------|
+| What is this code **supposed** to do? (intent, contract, how much you're allowed to touch) | `kg-ssot-check` | SSOT KG |
+| What **depends** on it? (the blast radius — the actual side-effect signal) | `kg-impl-check` | Impl KG |
+| Did we **already decide** something about this? | `kg-history-check` | Entire history |
+
+A dispatcher fans those three out, merges the answers, and hands Claude a short briefing. **If the change is risky, you get a warning naming the exact files, nodes, and decisions at stake — not a vague "this might affect things."**
+
+---
+
+## Quick start
+
+```bash
+cd your-repo
+/kg-init      # one-time bootstrap
+/clear        # so the agents register in the session
 ```
 
-### Side-effect warning rule
+Then just work normally. Ask for a feature. The pre-flight runs automatically.
 
-`kg-context-dispatch` flags `side_effect_warning: true` when:
+---
 
-1. Proposed work would breach a node's `touch_budget` (from SSOT).
-2. An affected node has > 3 dependents (from Impl) and the change is behavioral.
-3. An in-scope SSOT node is `deprecated` or `drift`.
-4. A prior Entire decision contradicts what the prompt proposes.
+## What you get from `/kg-init`
 
-The warning cites specific node IDs / file paths / DL IDs — not hand-wavy "this might affect things".
+| Artifact | What it is |
+|----------|-----------|
+| **Impl KG** — `.understand-anything/knowledge-graph.json` | What the code **IS**. Built & maintained by `understand-anything`. |
+| **SSOT KG** — `.understand-anything-ssot/knowledge-graph.json` | What the code **SHOULD BE**. Seeded once from the Impl KG with intent fields: `status`, `acceptance`, `contract`, `rationale_ref`, `touch_budget`. |
+| **Entire tracking** — `.entire/` | Local prompt/decision history. Auto-enabled if the `entire` CLI is present. |
+| **The agent fleet** | `kg-context-dispatch` (orchestrator) + the three checkers above. |
+| **Auto-fire hooks** | A `UserPromptSubmit` hook nudges Claude to run the dispatch on every real prompt — and self-skips greetings and trivial follow-ups. |
+| **Seed script** | `scripts/ssot_seed.py` for deterministic re-seeding. |
 
-### Token model
+---
 
-Sub-agents have isolated context windows. Main Claude pays for:
+## How the pre-flight runs
 
-- One dispatcher prompt (~500 tokens)
-- One compact JSON briefing back (~1500–3000 tokens, capped)
+```
+User prompt: "add a retry to the upload handler"
+   │
+   ▼
+Hook fires → main Claude calls kg-context-dispatch
+   │
+   ▼
+kg-context-dispatch   (classify the prompt → extract topic hints)
+   │
+   ▼  fan out IN PARALLEL — one message, three agents
+   ├───────────────────────┬───────────────────────┐
+   ▼                       ▼                       ▼
+kg-ssot-check        kg-impl-check          kg-history-check
+"what SHOULD          "what depends           "did we decide
+ it do?"               on it?"                 this already?"
+status, acceptance,   matching nodes +        prior prompts,
+contract,             DEPENDENTS  ◄── the     decisions,
+touch_budget          side-effect signal      sessions
+   │                       │                       │
+   └───────────────────────┴───────────────────────┘
+                           │
+                           ▼
+kg-context-dispatch   (merge + compute side_effect_warning)
+                           │
+                           ▼
+Main Claude gets a compact JSON briefing as authoritative context.
+If side_effect_warning = true → it shows you the warning BEFORE editing.
+```
 
-The three leaf agents (read full KG fragments, run `entire search`, etc.) **don't bill against the main session's context**. And because they run in one parallel message, wall-clock = `max(3)` not `sum(3)`.
+Because the three checkers run in one parallel message, wall-clock time is `max(3)`, not `sum(3)`.
 
-The dispatcher's Phase A classifier skips trivial prompts entirely — you don't pay the 4-agent cost on every "ok" or "show me the README".
+---
 
-## Scope
+## When you get a warning
 
-kg-workflow bootstraps and wires the dispatch flow. It does **not**:
+`kg-context-dispatch` raises `side_effect_warning: true` when:
 
-- Define a Decision Log, replay tool, or drift detector.
-- Scaffold `docs/ssot/` or any process directory (kg-init prompts the user if no such dir is detected).
-- Take a position on how you mutate SSOT after seeding.
+1. The work would breach a node's **`touch_budget`** (SSOT says "don't change more than X here").
+2. An affected node has **> 3 dependents** and the change is behavioral — i.e. real blast radius (Impl).
+3. An in-scope SSOT node is **`deprecated`** or in **`drift`**.
+4. A **prior Entire decision contradicts** what the prompt proposes.
+
+Every warning cites specific node IDs, file paths, and decision IDs. The point is to make the side effect *concrete and actionable*, so you can decide before the edit — not debug after.
+
+---
+
+## Why it's cheap
+
+Sub-agents have isolated context windows. Your main session only pays for:
+
+- one dispatcher prompt (~500 tokens), and
+- one compact JSON briefing back (~1.5–3k tokens, capped).
+
+The three checkers read full KG fragments and run `entire search` **in their own context** — that work never bills against your main session. And the dispatcher's classifier skips trivial prompts entirely, so you don't pay the multi-agent cost on every "ok" or "show me the README."
+
+---
+
+## Prerequisites
+
+- **`understand-anything` plugin** — kg-workflow calls its `/understand` skill to build the Impl KG.
+- **`python3` 3.11+** — for the seed script.
+- **A git repo** — `kg-init` refuses to run outside one.
+- **An SSOT process docs directory** (e.g. `docs/ssot/`). If missing, `kg-init` stops and prompts you (see below).
+- **Optional but recommended: the `entire` CLI** ([docs.entire.io](https://docs.entire.io)). Without it, `kg-history-check` degrades gracefully — it returns `entire_not_initialized` instead of failing.
+
+---
 
 ## Install
 
@@ -82,7 +126,7 @@ kg-workflow bootstraps and wires the dispatch flow. It does **not**:
 /plugin install kg-workflow
 ```
 
-After install, run `/clear` so the four agents register in the session.
+After install, run `/clear` so the agents register in the session.
 
 ### Other agents (Codex, Gemini CLI, OpenCode, etc.)
 
@@ -92,26 +136,13 @@ curl -fsSL https://raw.githubusercontent.com/potenlab/kg-workflow/main/install.s
 
 Supported platforms: `codex`, `gemini`, `opencode`, `vscode`, `vibe`. See `install.sh --help`.
 
-## Prerequisites
+---
 
-- `understand-anything` plugin installed (kg-workflow calls its `/understand` skill to build the Impl KG, and its agents are useful for KG lookup).
-- `python3` 3.11+ on the user's machine.
-- A git repo. `kg-init` refuses to run outside one.
-- An SSOT process docs directory (e.g. `docs/ssot/`). If missing, kg-init stops and prompts — see below.
-- **Optional but recommended:** the `entire` CLI from https://docs.entire.io. Without it, `kg-history-check` returns `entire_not_initialized` on every dispatch (graceful degrade, not fatal).
+## What `/kg-init` does, step by step
 
-## Usage
-
-```
-cd your-repo
-/kg-init
-```
-
-`kg-init` will, in order:
-
-1. **Detect SSOT process docs.** If none of `docs/ssot/`, `docs/SSOT/`, `ssot/`, `.ssot/`, or `docs/decisions/` is present, stop and prompt:
+1. **Detect SSOT process docs.** If none of `docs/ssot/`, `docs/SSOT/`, `ssot/`, `.ssot/`, or `docs/decisions/` exists, it stops and prompts:
    - `/kg-init --ssot-docs <path>` — I have docs at a custom path
-   - Set up docs first using your own tool/process, then re-run
+   - set up docs first with your own tool, then re-run
    - `/kg-init --ssot-docs none` — proceed with no docs reference
 2. Build the Impl KG via `/understand --full`.
 3. Drop `scripts/ssot_seed.py`.
@@ -119,14 +150,22 @@ cd your-repo
 5. Drop `.understand-anything-ssot/{README,schema}.md`.
 6. Write a root `.understandignore`.
 7. Append the kg-workflow stanza to `CLAUDE.md` (dispatch rule + status semantics + warning rule).
-8. **Initialize Entire** via `entire enable` if the CLI is installed. Otherwise warn and continue.
-9. Verify the four agents register.
+8. **Initialize Entire** via `entire enable` if the CLI is installed; otherwise warn and continue.
+9. Verify the agents register.
 
-Then run `/clear` and try a substantive prompt — main Claude should now dispatch via `kg-context-dispatch` before answering.
+Then `/clear` and try a real prompt — Claude should dispatch the pre-flight before answering.
 
-### Why the dispatch is a CLAUDE.md guideline, not a hard hook
+---
 
-Claude Code skills don't have a "pre-prompt hook" mechanism. The CLAUDE.md stanza is a strong guideline Claude follows reliably for substantive prompts, but it's not enforced at the harness level. If you want hard enforcement, add a `UserPromptSubmit` hook to your project's `.claude/settings.json` — out of scope for this plugin, but a sensible follow-up.
+## Scope
+
+kg-workflow bootstraps and wires the side-effect pre-flight. It deliberately does **not**:
+
+- Define a Decision Log, replay tool, or drift detector.
+- Scaffold `docs/ssot/` or any process directory (it prompts you instead).
+- Take a position on how you mutate SSOT after the initial seed.
+
+---
 
 ## Repo layout
 
@@ -138,16 +177,17 @@ kg-workflow/
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/
 │   │   └── kg-init/SKILL.md             # the /kg-init orchestration
-│   ├── agents/                          # parallel-dispatch fleet
-│   │   ├── kg-context-dispatch.md       # entry point — main Claude calls this
-│   │   ├── kg-ssot-check.md             # SSOT lookup (status, acceptance, touch_budget)
-│   │   ├── kg-impl-check.md             # Impl lookup + dependents (side-effect signal)
-│   │   └── kg-history-check.md          # Entire prior-prompt search
+│   ├── agents/                          # the side-effect pre-flight fleet
+│   │   ├── kg-context-dispatch.md       # orchestrator — main Claude calls this
+│   │   ├── kg-ssot-check.md             # intent: status, acceptance, touch_budget
+│   │   ├── kg-impl-check.md             # blast radius: nodes + dependents
+│   │   └── kg-history-check.md          # prior decisions via Entire
+│   ├── hooks/hooks.json                 # auto-fire the dispatch on each prompt
 │   └── templates/
 │       ├── claude-md-snippet.md         # appended to user's CLAUDE.md
 │       ├── understandignore             # root .understandignore
 │       ├── ssot/{README,schema}.md
-│       └── scripts/ssot_seed.py         # only script shipped
+│       └── scripts/ssot_seed.py
 ├── install.sh
 ├── README.md
 └── LICENSE
