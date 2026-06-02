@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f .understand-anything-ssot/knowledge-graph.json ] && printf '%s\\n' '[kg-workflow] Before substantive code or architecture work on this prompt, invoke the kg-context-dispatch agent. It fans out in PARALLEL to kg-ssot-check, kg-impl-check, and kg-history-check to load SSOT intent (status/acceptance/contract/touch_budget), Impl dependents (blast radius), and prior decisions/sessions from Entire, then returns a compact briefing plus any side-effect warning. Consult SSOT first, Impl second. Skip greetings, meta questions, and trivial follow-ups — the dispatcher self-skips when there is no real code scope.' || true"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f .understand-anything-ssot/knowledge-graph.json ] && printf '%s\\n' '[kg-workflow] This repo is bootstrapped with the dual KG workflow. For non-trivial code/architecture prompts, run kg-context-dispatch first (parallel SSOT + Impl + history lookup). Consult SSOT (.understand-anything-ssot) first, Impl (.understand-anything) second; respect touch_budget; derive tests from acceptance.' || true"
+          }
+        ]
+      }
+    ]
+  }
+}

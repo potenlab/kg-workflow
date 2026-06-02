@@ -266,6 +266,16 @@ These were installed when the plugin was installed (they live in `<plugin>/agent
                         (run /clear if /kg-init was your first invocation, so they register)
 ```
 
+The dispatch **trigger** ships with the plugin too: `<plugin>/hooks/hooks.json` registers a
+`UserPromptSubmit` hook (and a `SessionStart` reminder) that fire automatically once the plugin
+is enabled. Each command self-gates on `.understand-anything-ssot/knowledge-graph.json`, so it is
+a silent no-op in repos that haven't been bootstrapped. This is why kg-init does NOT write any
+hook into the repo's `settings.json` — the trigger belongs to the plugin so it survives re-clones
+and stays consistent across every bootstrapped repo. kg-init only verifies it is present.
+
+If the hook does not fire after init, tell the user to `/clear` (or restart the session) so the
+plugin's hooks load.
+
 ## Phase 9 — Report
 
 Print a summary:
@@ -277,6 +287,7 @@ Print a summary:
 [kg-init] ✓ CLAUDE.md  appended kg-workflow stanza
 [kg-init] ✓ Entire     enabled (or warning emitted in Phase 7)
 [kg-init] ✓ Agents     kg-context-dispatch + 3 leaves
+[kg-init] ✓ Hooks      UserPromptSubmit + SessionStart → kg-context-dispatch (plugin-provided, self-gating)
 
 Next steps:
   1. Read .understand-anything-ssot/README.md to understand the SSOT fields.
