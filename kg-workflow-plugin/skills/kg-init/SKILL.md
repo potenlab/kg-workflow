@@ -147,13 +147,17 @@ If `/understand` does not produce `.understand-anything/knowledge-graph.json`, a
 
 > **Impl auto-updates; SSOT does not.** Only the Impl KG is wired to refresh on commit. The SSOT KG (seeded in Phase 3 with `{"autoUpdate": false}`) represents *intent* and must be mutated deliberately — never regenerated from source. Leave SSOT auto-update off.
 
-## Phase 2 — Install the seed script
+## Phase 2 — Install the seed + drift scripts
 
 ```bash
 mkdir -p "$PROJECT_ROOT/$SCRIPTS_DIR"
 cp "$PLUGIN_ROOT/templates/scripts/ssot_seed.py" "$PROJECT_ROOT/$SCRIPTS_DIR/ssot_seed.py"
-chmod +x "$PROJECT_ROOT/$SCRIPTS_DIR/ssot_seed.py"
+cp "$PLUGIN_ROOT/templates/scripts/ssot_diff.py" "$PROJECT_ROOT/$SCRIPTS_DIR/ssot_diff.py"
+chmod +x "$PROJECT_ROOT/$SCRIPTS_DIR/ssot_seed.py" "$PROJECT_ROOT/$SCRIPTS_DIR/ssot_diff.py"
 ```
+
+- `ssot_seed.py` — deterministic (re)seed of the SSOT KG from the Impl KG.
+- `ssot_diff.py` — reports drift between the **frozen SSOT** and the **live, auto-updating Impl** (uncovered code / orphaned intent / moved nodes). The plugin's `SessionStart` hook runs it with `--quiet` so it stays silent when the two graphs are in sync and only speaks up when real drift appears. This is what makes the dispatcher's `status: "drift"` / blast-radius warnings observable instead of dormant.
 
 ## Phase 3 — Seed the SSOT KG
 
@@ -292,11 +296,11 @@ Print a summary:
 ```
 [kg-init] ✓ Impl KG    .understand-anything/        (N nodes, M edges, L layers; auto-update ON)
 [kg-init] ✓ SSOT KG    .understand-anything-ssot/   (seeded from Impl; auto-update OFF by design)
-[kg-init] ✓ Script     scripts/ssot_seed.py
+[kg-init] ✓ Scripts    scripts/ssot_seed.py, scripts/ssot_diff.py
 [kg-init] ✓ CLAUDE.md  appended kg-workflow stanza
 [kg-init] ✓ Entire     enabled (or warning emitted in Phase 7)
 [kg-init] ✓ Agents     kg-context-dispatch + 3 leaves
-[kg-init] ✓ Hooks      UserPromptSubmit + SessionStart → kg-context-dispatch (plugin-provided, self-gating)
+[kg-init] ✓ Hooks      UserPromptSubmit → kg-context-dispatch; SessionStart → SSOT drift report (plugin-provided, self-gating)
 
 Next steps:
   1. Read .understand-anything-ssot/README.md to understand the SSOT fields.

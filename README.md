@@ -43,8 +43,8 @@ Then just work normally. Ask for a feature. The pre-flight runs automatically.
 | **SSOT KG** — `.understand-anything-ssot/knowledge-graph.json` | What the code **SHOULD BE**. Seeded once from the Impl KG with intent fields: `status`, `acceptance`, `contract`, `rationale_ref`, `touch_budget`. |
 | **Entire tracking** — `.entire/` | Local prompt/decision history. Auto-enabled if the `entire` CLI is present. |
 | **The agent fleet** | `kg-context-dispatch` (orchestrator) + the three checkers above. |
-| **Auto-fire hooks** | A `UserPromptSubmit` hook nudges Claude to run the dispatch on every real prompt — and self-skips greetings and trivial follow-ups. |
-| **Seed script** | `scripts/ssot_seed.py` for deterministic re-seeding. |
+| **Auto-fire hooks** | A `UserPromptSubmit` hook nudges Claude to run the dispatch on every real prompt; a `SessionStart` hook runs the **SSOT drift report** so divergence between the frozen SSOT and the auto-updating Impl surfaces on its own. Both self-skip when there's nothing to do. |
+| **Scripts** | `scripts/ssot_seed.py` (deterministic re-seed) and `scripts/ssot_diff.py` (drift report). |
 
 ---
 
@@ -159,9 +159,10 @@ Then `/clear` and try a real prompt — Claude should dispatch the pre-flight be
 
 ## Scope
 
-kg-workflow bootstraps and wires the side-effect pre-flight. It deliberately does **not**:
+kg-workflow bootstraps and wires the side-effect pre-flight, and ships a **drift report** (`ssot_diff.py`) that flags when the auto-updating Impl has diverged from the frozen SSOT. It deliberately does **not**:
 
-- Define a Decision Log, replay tool, or drift detector.
+- Define a Decision Log or replay tool.
+- *Auto-reconcile* drift — it reports what diverged; updating SSOT intent stays a deliberate, human decision.
 - Scaffold `docs/ssot/` or any process directory (it prompts you instead).
 - Take a position on how you mutate SSOT after the initial seed.
 
@@ -187,7 +188,9 @@ kg-workflow/
 │       ├── claude-md-snippet.md         # appended to user's CLAUDE.md
 │       ├── understandignore             # root .understandignore
 │       ├── ssot/{README,schema}.md
-│       └── scripts/ssot_seed.py
+│       └── scripts/
+│           ├── ssot_seed.py              # deterministic SSOT (re)seed
+│           └── ssot_diff.py              # drift report: frozen SSOT vs live Impl
 ├── install.sh
 ├── README.md
 └── LICENSE

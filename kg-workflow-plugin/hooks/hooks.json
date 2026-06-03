@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f .understand-anything-ssot/knowledge-graph.json ] && [ -f .understand-anything/knowledge-graph.json ]; then if [ -f engine/scripts/ssot_diff.py ]; then printf '%s\\n' '[kg-workflow] SSOT drift report'; python3 engine/scripts/ssot_diff.py 2>/dev/null; elif [ -f scripts/ssot_diff.py ]; then printf '%s\\n' '[kg-workflow] SSOT drift report'; python3 scripts/ssot_diff.py 2>/dev/null; fi; fi; true"
+            "command": "if [ -f .understand-anything-ssot/knowledge-graph.json ] && [ -f .understand-anything/knowledge-graph.json ]; then if [ -f engine/scripts/ssot_diff.py ]; then python3 engine/scripts/ssot_diff.py --quiet 2>/dev/null; elif [ -f scripts/ssot_diff.py ]; then python3 scripts/ssot_diff.py --quiet 2>/dev/null; fi; fi; true"
           }
         ]
       }
