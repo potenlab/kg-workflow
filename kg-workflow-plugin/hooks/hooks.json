@@ -1,31 +1,42 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f .understand-anything-ssot/knowledge-graph.json ] && printf '%s\\n' '<EXTREMELY-IMPORTANT> This repo runs the dual knowledge-graph workflow. STANDING RULE for this entire session: before ANY substantive code or architecture work, your FIRST action MUST be to invoke the kg-context-dispatch agent via the Task tool, and you must let IT decide whether to skip. It loads SSOT intent first (status, acceptance, contract, touch_budget), then Impl reality and blast radius, plus prior decisions, and returns a side-effect warning. Do not edit files or commit to a design before it returns. Consult SSOT first, Impl second. Respect touch_budget. Derive tests from acceptance. This is not optional and you cannot rationalize your way out of it. </EXTREMELY-IMPORTANT>' || true"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .understand-anything-ssot/knowledge-graph.json ] && [ -f .understand-anything/knowledge-graph.json ]; then if [ -f engine/scripts/ssot_diff.py ]; then python3 engine/scripts/ssot_diff.py --quiet 2>/dev/null; elif [ -f scripts/ssot_diff.py ]; then python3 scripts/ssot_diff.py --quiet 2>/dev/null; fi; fi; true"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "[ -f .understand-anything-ssot/knowledge-graph.json ] && printf '%s\\n' '[kg-workflow] Before substantive code or architecture work on this prompt, invoke the kg-context-dispatch agent. It fans out in PARALLEL to kg-ssot-check, kg-impl-check, and kg-history-check to load SSOT intent (status/acceptance/contract/touch_budget), Impl dependents (blast radius), and prior decisions/sessions from Entire, then returns a compact briefing plus any side-effect warning. Consult SSOT first, Impl second. Skip greetings, meta questions, and trivial follow-ups — the dispatcher self-skips when there is no real code scope.' || true"
+            "command": "[ -f .understand-anything-ssot/knowledge-graph.json ] && printf '%s\\n' '<EXTREMELY-IMPORTANT> kg-workflow: before doing anything substantive on THIS prompt, your FIRST tool call MUST be the kg-context-dispatch agent (Task tool). ALWAYS invoke it first and let the dispatcher itself decide whether to skip; it self-skips cheaply for greetings, meta questions, and trivial follow-ups, and otherwise returns SSOT intent (status, acceptance, contract, touch_budget), Impl blast radius, and a side-effect warning. Do not edit files, write code, or design until it returns. Consult SSOT first, Impl second. Respect touch_budget. This is not optional and you cannot rationalize your way out of it. </EXTREMELY-IMPORTANT>' || true"
           }
         ]
       }
     ],
-    "SessionStart": [
+    "PostToolUse": [
       {
-        "matcher": "startup,resume",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "[ -f .understand-anything-ssot/knowledge-graph.json ] && printf '%s\\n' '[kg-workflow] This repo is bootstrapped with the dual KG workflow. For non-trivial code/architecture prompts, run kg-context-dispatch first (parallel SSOT + Impl + history lookup). Consult SSOT (.understand-anything-ssot) first, Impl (.understand-anything) second; respect touch_budget; derive tests from acceptance.' || true"
-          }
-        ]
-      },
-      {
-        "matcher": "startup,resume",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "if [ -f .understand-anything-ssot/knowledge-graph.json ] && [ -f .understand-anything/knowledge-graph.json ]; then if [ -f engine/scripts/ssot_diff.py ]; then python3 engine/scripts/ssot_diff.py --quiet 2>/dev/null; elif [ -f scripts/ssot_diff.py ]; then python3 scripts/ssot_diff.py --quiet 2>/dev/null; fi; fi; true"
+            "command": "sh -c 'IN=$(cat 2>/dev/null); printf \"%s\" \"$IN\" | grep -qE \"git[[:space:]]+(commit|merge|cherry-pick|rebase)\" || exit 0; [ -f .understand-anything-ssot/knowledge-graph.json ] || exit 0; printf \"%s\\n\" \"<EXTREMELY-IMPORTANT> kg-workflow: a commit/merge just happened. Track this change in BOTH knowledge graphs now, without asking the user: (1) Impl KG \u2014 if .understand-anything/config.json has autoUpdate true, ensure the understand-anything incremental update runs so the graph matches the new code. (2) SSOT KG \u2014 if this commit changed intent, behavior, or a contract, append a Decision Log entry under docs/ssot/decisions/ and run the ssot replay script (engine/scripts/ssot_replay.py or scripts/ssot_replay.py) so the SSOT graph tracks it. Then stage and commit the updated graph files. </EXTREMELY-IMPORTANT>\"'"
           }
         ]
       }
